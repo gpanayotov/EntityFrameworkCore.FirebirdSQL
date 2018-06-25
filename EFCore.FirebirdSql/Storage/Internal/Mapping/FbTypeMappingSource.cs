@@ -115,13 +115,10 @@ namespace EntityFrameworkCore.FirebirdSql.Storage.Internal.Mapping
                 { typeof(TimeSpan), _time },
                 { typeof(Guid), _guid }
             };
-
-
         }
 
         protected override RelationalTypeMapping FindMapping(in RelationalTypeMappingInfo mappingInfo)
             => FindRawMapping(mappingInfo)?.Clone(mappingInfo);
-
 
         protected override void ValidateMapping(CoreTypeMapping mapping, IProperty property)
         {
