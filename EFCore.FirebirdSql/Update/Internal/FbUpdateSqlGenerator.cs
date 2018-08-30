@@ -21,6 +21,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Update;
 using EntityFrameworkCore.FirebirdSql.Infrastructure.Internal;
 using EntityFrameworkCore.FirebirdSql.Storage.Internal;
+using System.Collections.Generic;
 
 namespace EntityFrameworkCore.FirebirdSql.Update.Internal
 {
@@ -73,18 +74,14 @@ namespace EntityFrameworkCore.FirebirdSql.Update.Internal
             var writeOperations = operations.Where(o => o.IsWrite).ToList();
             var readOperations = operations.Where(o => o.IsRead).ToList();
             var conditionOperations = operations.Where(o => o.IsCondition).ToList();
-            var inputOperations = operations.Where(o => o.IsWrite || o.IsCondition).ToList();
-            var anyRead = readOperations.Any();
+			var inputOperations = GenerateParameters(operations.Where(o => o.IsWrite || o.IsCondition)).ToList();           
+ 			var anyRead = readOperations.Any();
             commandStringBuilder.Append("EXECUTE BLOCK (");
-            commandStringBuilder.AppendJoin(inputOperations, (b, e) =>
-            {
-                var type = GetColumnType(e);
-                var parameterName = e.UseOriginalValueParameter
-                    ? e.OriginalParameterName
-                    : e.ParameterName;
-                b.Append(parameterName);
-                b.Append(" ");
-                b.Append(type);
+    		commandStringBuilder.AppendJoin(inputOperations, (b, p) =>
+			{
+				b.Append(p.name);
+				b.Append(" ");
+				b.Append(p.type);
                 b.Append(" = ?");
             }, ", ");
             commandStringBuilder.AppendLine(")");
@@ -199,5 +196,21 @@ namespace EntityFrameworkCore.FirebirdSql.Update.Internal
 
         string GetColumnType(ColumnModification column)
             => _typeMapper.FindMapping(column.Property).StoreType;
+
+		IEnumerable<(string name, string type)> GenerateParameters(IEnumerable<ColumnModification> columns)
+		{
+			foreach (var item in columns)
+			{
+				var type = GetColumnType(item);
+				if (item.UseCurrentValueParameter)
+				{
+					yield return (item.ParameterName, type);
+				}
+				if (item.UseOriginalValueParameter)
+				{
+					yield return (item.OriginalParameterName, type);
+				}
+			}
+		}
     }
 }
