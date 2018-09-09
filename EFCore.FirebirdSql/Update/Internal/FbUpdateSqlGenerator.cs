@@ -74,16 +74,16 @@ namespace EntityFrameworkCore.FirebirdSql.Update.Internal
             var writeOperations = operations.Where(o => o.IsWrite).ToList();
             var readOperations = operations.Where(o => o.IsRead).ToList();
             var conditionOperations = operations.Where(o => o.IsCondition).ToList();
-            var inputOperations = GetParameters(operations.Where(o => o.IsWrite || o.IsCondition));
+            var inputOperations = GenerateParameters(operations.Where(o => o.IsWrite || o.IsCondition)).ToList();
             var anyRead = readOperations.Any();
             commandStringBuilder.Append("EXECUTE BLOCK (");
             commandStringBuilder.AppendJoin(inputOperations, (o, p) =>
             {
-                o.Append(p.Key);
+                o.Append(p.name);
                 o.Append(" ");
-                o.Append(p.Value);
+                o.Append(p.type);
                 o.Append(" = ?");
-            }, ", "); 
+            }, ", ");
             commandStringBuilder.AppendLine(")");
             commandStringBuilder.Append("RETURNS (");
             if (anyRead)
@@ -121,7 +121,12 @@ namespace EntityFrameworkCore.FirebirdSql.Update.Internal
                 commandStringBuilder.AppendJoin(readOperations, (b, e) =>
                 {
                     b.Append(SqlGenerationHelper.DelimitIdentifier(e.ColumnName));
-                    b.Append(" INTO :");
+
+                }, ", ");
+                commandStringBuilder.Append(" INTO ");
+                commandStringBuilder.AppendJoin(readOperations, (b, e) =>
+                {
+                    b.Append(" :");
                     b.Append(SqlGenerationHelper.DelimitIdentifier(e.ColumnName));
                 }, ", ");
             }
@@ -147,13 +152,13 @@ namespace EntityFrameworkCore.FirebirdSql.Update.Internal
             var name = command.TableName;
             var operations = command.ColumnModifications;
             var conditionOperations = operations.Where(o => o.IsCondition).ToList();
-            var inputOperations = GetParameters(conditionOperations);
+            var inputOperations = GenerateParameters(conditionOperations).ToList();
             commandStringBuilder.Append("EXECUTE BLOCK (");
             commandStringBuilder.AppendJoin(inputOperations, (o, p) =>
             {
-                o.Append(p.Key);
+                o.Append(p.name);
                 o.Append(" ");
-                o.Append(p.Value);
+                o.Append(p.type);
                 o.Append(" = ?");
             }, ", ");
             commandStringBuilder.AppendLine(")");
@@ -193,22 +198,20 @@ namespace EntityFrameworkCore.FirebirdSql.Update.Internal
         string GetColumnType(ColumnModification column)
             => _typeMapper.GetMapping(column.Property).StoreType;
 
-        private  Dictionary<string,string> GetParameters(IEnumerable<ColumnModification> columns)
+        IEnumerable<(string name, string type)> GenerateParameters(IEnumerable<ColumnModification> columns)
         {
-            var parameters = new Dictionary<string, string>();
             foreach (var item in columns)
             {
                 var type = GetColumnType(item);
                 if (item.UseCurrentValueParameter)
                 {
-                    parameters.Add(item.ParameterName, type); 
+                    yield return (item.ParameterName, type);
                 }
                 if (item.UseOriginalValueParameter)
                 {
-                    parameters.Add(item.ParameterName, type);
+                    yield return (item.OriginalParameterName, type);
                 }
             }
-            return parameters;
         }
     }
 }
