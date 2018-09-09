@@ -74,7 +74,7 @@ namespace EntityFrameworkCore.FirebirdSql.Update.Internal
             var writeOperations = operations.Where(o => o.IsWrite).ToList();
             var readOperations = operations.Where(o => o.IsRead).ToList();
             var conditionOperations = operations.Where(o => o.IsCondition).ToList();
-			var inputOperations = GenerateParameters(operations.Where(o => o.IsWrite || o.IsCondition)).ToList();           
+			var inputOperations = GenerateParameters(operations.Where(o => o.IsWrite || o.IsCondition)).ToList();
  			var anyRead = readOperations.Any();
             commandStringBuilder.Append("EXECUTE BLOCK (");
     		commandStringBuilder.AppendJoin(inputOperations, (b, p) =>
@@ -118,10 +118,15 @@ namespace EntityFrameworkCore.FirebirdSql.Update.Internal
             {
                 commandStringBuilder.AppendLine();
                 commandStringBuilder.Append("RETURNING ");
+
                 commandStringBuilder.AppendJoin(readOperations, (b, e) =>
                 {
                     b.Append(SqlGenerationHelper.DelimitIdentifier(e.ColumnName));
-                    b.Append(" INTO :");
+                }, ", ");
+				commandStringBuilder.Append(" INTO ");
+                commandStringBuilder.AppendJoin(readOperations, (b, e) =>
+                {
+                    b.Append(" :");
                     b.Append(SqlGenerationHelper.DelimitIdentifier(e.ColumnName));
                 }, ", ");
             }
